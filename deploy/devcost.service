@@ -1,0 +1,30 @@
+[Unit]
+Description=devcost - dev cost tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=devcost
+Group=devcost
+WorkingDirectory=/opt/devcost
+EnvironmentFile=/etc/devcost/devcost.env
+ExecStart=/usr/bin/node /opt/devcost/build/index.js
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/var/lib/devcost
+StateDirectory=devcost
+StateDirectoryMode=0750
+
+[Install]
+WantedBy=multi-user.target
