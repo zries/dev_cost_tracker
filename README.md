@@ -35,6 +35,18 @@ bash deploy/proxmox-create.sh        # 512 MiB / 1 core / 4 GiB / port 6767
 
 Then open `http://<container-ip>:6767`. Log in as `admin / admin`.
 
+## Upgrade an existing install
+
+Re-run the same script inside the LXC — it's idempotent. New code, dependencies, and schema migrations get picked up; your data and config are left alone.
+
+```bash
+# from the Proxmox host
+pct exec 108 -- /usr/local/sbin/devcost-backup       # optional pre-upgrade snapshot
+pct exec 108 -- bash /opt/devcost/deploy/install.sh
+```
+
+Full details (what's touched, what isn't, watching migrations apply, restoring from backup) in [`deploy/README.md`](deploy/README.md#upgrading-an-existing-install).
+
 ## How costs roll up
 
 Every cost has a **scope**:
