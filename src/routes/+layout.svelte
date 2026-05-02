@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/stores';
+	import Toaster from '$lib/components/Toaster.svelte';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
@@ -58,3 +59,5 @@
 {:else}
 	{@render children()}
 {/if}
+
+<Toaster />

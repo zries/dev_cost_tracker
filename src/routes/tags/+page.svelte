@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+	import { withToast } from '$lib/enhance';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -25,7 +27,12 @@
 
 <div class="card mb-4">
 	<div class="card-header"><h2 class="font-medium">New tag</h2></div>
-	<form method="POST" action="?/create" class="card-body grid grid-cols-1 sm:grid-cols-6 gap-3">
+	<form
+		method="POST"
+		action="?/create"
+		use:enhance={withToast('Tag created.')}
+		class="card-body grid grid-cols-1 sm:grid-cols-6 gap-3"
+	>
 		<div class="sm:col-span-3">
 			<label for="name" class="label">Name</label>
 			<input id="name" name="name" type="text" required maxlength="60" class="input" placeholder="e.g. Tailwind, Inertia, GraphQL" />
@@ -78,7 +85,12 @@
 						{#if editingId === t.id}
 							<tr>
 								<td colspan="4">
-									<form method="POST" action="?/rename" class="flex flex-wrap items-center gap-2 py-1">
+									<form
+									method="POST"
+									action="?/rename"
+									use:enhance={withToast('Tag renamed.')}
+									class="flex flex-wrap items-center gap-2 py-1"
+								>
 										<input type="hidden" name="id" value={t.id} />
 										<input name="name" type="text" required maxlength="60" value={t.name} class="input flex-1 min-w-[10rem]" />
 										<input name="category" type="text" required maxlength="40" value={t.category} class="input flex-1 min-w-[10rem]" list="categories" />
@@ -94,7 +106,12 @@
 								<td class="text-right tabular-nums text-fg-muted">{t.costCount}</td>
 								<td class="text-right whitespace-nowrap">
 									<button type="button" class="btn btn-ghost text-xs" onclick={() => (editingId = t.id)}>Edit</button>
-									<form method="POST" action="?/delete" class="inline">
+									<form
+										method="POST"
+										action="?/delete"
+										use:enhance={withToast(`Tag "${t.name}" deleted.`)}
+										class="inline"
+									>
 										<input type="hidden" name="id" value={t.id} />
 										<button
 											type="submit"

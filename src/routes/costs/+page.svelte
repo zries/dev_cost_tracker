@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { fmtMoneyPrecise } from '$lib/format';
+	import { withToast } from '$lib/enhance';
 	import AllocationEditor from '$lib/components/AllocationEditor.svelte';
 	import TagPicker from '$lib/components/TagPicker.svelte';
 	import type { PageData, ActionData } from './$types';
@@ -32,7 +34,12 @@
 {#if showNew}
 	<div class="card mb-4">
 		<div class="card-header"><h2 class="font-medium">New cost</h2></div>
-		<form method="POST" action="?/create" class="card-body grid grid-cols-1 sm:grid-cols-6 gap-3">
+		<form
+			method="POST"
+			action="?/create"
+			use:enhance={withToast('Cost created.')}
+			class="card-body grid grid-cols-1 sm:grid-cols-6 gap-3"
+		>
 			<div class="sm:col-span-3">
 				<label for="name" class="label">Name</label>
 				<input id="name" name="name" type="text" required class="input" placeholder="Claude Max, Vercel Pro, …" />
@@ -158,7 +165,12 @@
 					<td class="text-right tabular-nums">{fmtMoneyPrecise(c.amount, c.currency)}</td>
 					<td class="text-right tabular-nums font-medium">{fmtMoneyPrecise(c.monthlyAmount, c.currency)}</td>
 					<td>
-						<form method="POST" action="?/toggleActive" class="contents">
+						<form
+							method="POST"
+							action="?/toggleActive"
+							use:enhance={withToast(c.active ? `"${c.name}" deactivated.` : `"${c.name}" activated.`)}
+							class="contents"
+						>
 							<input type="hidden" name="id" value={c.id} />
 							<input type="hidden" name="active" value={c.active ? '0' : '1'} />
 							<button type="submit" class="badge {c.active ? 'badge-shared' : ''}">
@@ -167,7 +179,12 @@
 						</form>
 					</td>
 					<td class="text-right">
-						<form method="POST" action="?/delete" class="inline">
+						<form
+							method="POST"
+							action="?/delete"
+							use:enhance={withToast(`Cost "${c.name}" deleted.`)}
+							class="inline"
+						>
 							<input type="hidden" name="id" value={c.id} />
 							<button
 								type="submit"

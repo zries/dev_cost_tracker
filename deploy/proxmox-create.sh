@@ -8,7 +8,7 @@
 # prompt.
 #
 # Tunable env vars (all optional):
-#   CTID=200                    Container ID
+#   CTID=                       Container ID. Defaults to the next free ID (via `pvesh get /cluster/nextid`).
 #   CT_HOSTNAME=devcost         Container hostname (also the Proxmox display name)
 #   STORAGE=local-lvm           Proxmox storage pool for the rootfs
 #   DISK_GB=4
@@ -54,7 +54,11 @@ if [[ ! -t 0 ]]; then
 	INTERACTIVE=0
 fi
 
-CTID="${CTID:-200}"
+# Default CTID: ask Proxmox for the next free ID. Fall back to 200 if pvesh isn't available
+# (e.g. dry-running on a non-Proxmox box) — the pct check later will catch a real collision.
+if [[ -z "${CTID:-}" ]]; then
+	CTID="$(pvesh get /cluster/nextid 2>/dev/null || echo 200)"
+fi
 # NOTE: do not use the bare name HOSTNAME here — bash auto-populates it with
 # the host's own hostname, which would shadow our default.
 CT_HOSTNAME="${CT_HOSTNAME:-devcost}"

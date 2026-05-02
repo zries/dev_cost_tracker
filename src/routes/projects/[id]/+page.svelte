@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { fmtMoneyPrecise, fmtPercent } from '$lib/format';
+	import { withToast } from '$lib/enhance';
 	import TagPicker from '$lib/components/TagPicker.svelte';
 	import type { PageData, ActionData } from './$types';
 
@@ -43,7 +45,12 @@
 {#if editing}
 	<div class="card mb-4">
 		<div class="card-header"><h2 class="font-medium">Edit project</h2></div>
-		<form method="POST" action="?/update" class="card-body grid grid-cols-1 sm:grid-cols-2 gap-3">
+		<form
+			method="POST"
+			action="?/update"
+			use:enhance={withToast('Project updated.')}
+			class="card-body grid grid-cols-1 sm:grid-cols-2 gap-3"
+		>
 			<div class="sm:col-span-2">
 				<label for="name" class="label">Name</label>
 				<input id="name" name="name" type="text" required class="input" value={r.project.name} />
@@ -76,7 +83,11 @@
 			</div>
 		</form>
 		<div class="card-body border-t border-border">
-			<form method="POST" action="?/delete">
+			<form
+				method="POST"
+				action="?/delete"
+				use:enhance={withToast(`Project "${r.project.name}" deleted.`)}
+			>
 				<button
 					type="submit"
 					class="btn btn-danger"

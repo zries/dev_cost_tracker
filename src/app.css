@@ -108,6 +108,31 @@
 	.chip-readonly {
 		@apply cursor-default hover:border-border-strong;
 	}
+	.toast {
+		@apply flex items-start gap-2 rounded-md border px-3 py-2 shadow-lg
+			border-border-strong bg-bg-subtle text-fg-base;
+	}
+	.toast-icon {
+		@apply inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold flex-shrink-0;
+	}
+	.toast-success {
+		@apply border-success/40 bg-success/10;
+	}
+	.toast-success .toast-icon {
+		@apply bg-success/20 text-success;
+	}
+	.toast-error {
+		@apply border-danger/40 bg-danger/10;
+	}
+	.toast-error .toast-icon {
+		@apply bg-danger/20 text-danger;
+	}
+	.toast-info {
+		@apply border-accent/40 bg-accent/10;
+	}
+	.toast-info .toast-icon {
+		@apply bg-accent/20 text-accent;
+	}
 	.table {
 		@apply w-full text-sm;
 	}

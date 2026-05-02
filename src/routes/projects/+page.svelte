@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { fmtMoneyPrecise } from '$lib/format';
+	import { withToast } from '$lib/enhance';
 	import TagPicker from '$lib/components/TagPicker.svelte';
 	import type { PageData, ActionData } from './$types';
 
@@ -24,7 +26,12 @@
 {#if showNew}
 	<div class="card mb-4">
 		<div class="card-header"><h2 class="font-medium">New project</h2></div>
-		<form method="POST" action="?/create" class="card-body grid grid-cols-1 sm:grid-cols-2 gap-3">
+		<form
+			method="POST"
+			action="?/create"
+			use:enhance={withToast('Project created.')}
+			class="card-body grid grid-cols-1 sm:grid-cols-2 gap-3"
+		>
 			<div class="sm:col-span-2">
 				<label for="name" class="label">Name</label>
 				<input id="name" name="name" type="text" required class="input" />
@@ -106,7 +113,12 @@
 					<td class="text-right tabular-nums">{fmtMoneyPrecise(p.tagMonthly)}</td>
 					<td class="text-right tabular-nums font-semibold">{fmtMoneyPrecise(p.totalMonthly)}</td>
 					<td class="text-right">
-						<form method="POST" action="?/delete" class="inline">
+						<form
+							method="POST"
+							action="?/delete"
+							use:enhance={withToast(`Project "${p.name}" deleted.`)}
+							class="inline"
+						>
 							<input type="hidden" name="id" value={p.id} />
 							<button
 								type="submit"

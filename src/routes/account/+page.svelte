@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
+	import { withToast } from '$lib/enhance';
 	import type { PageData, ActionData } from './$types';
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 </script>
@@ -19,7 +21,7 @@
 
 	<div class="card">
 		<div class="card-header"><h2 class="font-medium">Change password</h2></div>
-		<form method="POST" class="card-body space-y-3">
+		<form method="POST" use:enhance={withToast('Password updated.')} class="card-body space-y-3">
 			<div>
 				<label for="current" class="label">Current password</label>
 				<input id="current" name="current" type="password" autocomplete="current-password" required class="input" />

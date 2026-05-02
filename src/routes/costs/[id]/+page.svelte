@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { enhance } from '$app/forms';
 	import { fmtMoneyPrecise } from '$lib/format';
+	import { toast } from '$lib/toast.svelte';
 	import AllocationEditor from '$lib/components/AllocationEditor.svelte';
 	import TagPicker from '$lib/components/TagPicker.svelte';
 	import type { PageData, ActionData } from './$types';
@@ -58,7 +60,25 @@
 
 <div class="card">
 	<div class="card-header"><h2 class="font-medium">Edit cost</h2></div>
-	<form method="POST" action="?/update" class="card-body grid grid-cols-1 sm:grid-cols-6 gap-3">
+	<form
+		method="POST"
+		action="?/update"
+		use:enhance={({ submitter }) => {
+			const isDelete = (submitter as HTMLButtonElement)?.formAction?.includes('/delete');
+			return async ({ result, update }) => {
+				if (result.type === 'redirect') {
+					toast.success(isDelete ? `Cost "${c.name}" deleted.` : 'Cost updated.');
+				} else if (result.type === 'failure') {
+					const err = (result.data as { error?: string } | undefined)?.error ?? 'Save failed.';
+					toast.error(err);
+				} else if (result.type === 'error') {
+					toast.error('Server error: ' + (result.error?.message ?? 'unknown'));
+				}
+				await update();
+			};
+		}}
+		class="card-body grid grid-cols-1 sm:grid-cols-6 gap-3"
+	>
 		<div class="sm:col-span-3">
 			<label for="name" class="label">Name</label>
 			<input id="name" name="name" type="text" required class="input" value={c.name} />
