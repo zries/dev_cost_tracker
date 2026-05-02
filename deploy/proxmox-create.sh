@@ -16,7 +16,10 @@
 #   CORES=1
 #   BRIDGE=vmbr0
 #   IP=dhcp                     or e.g. 192.168.1.50/24,gw=192.168.1.1
-#   TEMPLATE=local:vztmpl/debian-12-standard_12.2-1_amd64.tar.zst
+#   TEMPLATE=                   Defaults to the latest available debian-12-standard,
+#                               or pass e.g. local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst
+#   TEMPLATE_STORAGE=local      Storage that holds vztmpl files (where templates live)
+#   AUTO_DOWNLOAD_TEMPLATE=1    Auto-download missing template (set 0 to refuse)
 #   PASSWORD=                   root password for the container; auto-generated if empty
 #   PORT=8080                   App port (passed through to install.sh)
 #   ADMIN_USERNAME=admin
@@ -59,7 +62,9 @@ MEMORY_MB="${MEMORY_MB:-512}"
 CORES="${CORES:-1}"
 BRIDGE="${BRIDGE:-vmbr0}"
 IP="${IP:-dhcp}"
-TEMPLATE="${TEMPLATE:-local:vztmpl/debian-12-standard_12.2-1_amd64.tar.zst}"
+TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-local}"
+TEMPLATE_FALLBACK="debian-12-standard_12.7-1_amd64.tar.zst"
+AUTO_DOWNLOAD_TEMPLATE="${AUTO_DOWNLOAD_TEMPLATE:-1}"
 PASSWORD="${PASSWORD:-}"
 PORT="${PORT:-8080}"
 ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
@@ -68,6 +73,23 @@ REPO_URL="${REPO_URL:-https://github.com/zries/dev_cost_tracker.git}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 UNPRIVILEGED="${UNPRIVILEGED:-1}"
 ONBOOT="${ONBOOT:-1}"
+
+# Auto-detect latest debian-12-standard template if not explicitly set.
+if [[ -z "${TEMPLATE:-}" ]]; then
+	if command -v pveam >/dev/null 2>&1; then
+		pveam update >/dev/null 2>&1 || true
+		detected="$(pveam available --section system 2>/dev/null \
+			| awk '$2 ~ /^debian-12-standard_.*_amd64\.tar\.(zst|gz|xz)$/ {print $2}' \
+			| sort -V | tail -1)"
+	else
+		detected=""
+	fi
+	if [[ -n "$detected" ]]; then
+		TEMPLATE="${TEMPLATE_STORAGE}:vztmpl/${detected}"
+	else
+		TEMPLATE="${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE_FALLBACK}"
+	fi
+fi
 
 ask() {
 	local var="$1" prompt="$2" current="${!1}" input
@@ -192,6 +214,45 @@ fi
 if pct status "$CTID" >/dev/null 2>&1; then
 	echo "Container $CTID already exists. Stop & destroy it, or pick a different CTID." >&2
 	exit 1
+fi
+
+# Pre-flight: make sure the template volume exists locally; offer to download.
+template_volume_present() {
+	local vol="$1" storage="${vol%%:*}" file="${vol##*/}"
+	pveam list "$storage" 2>/dev/null | awk -v v="$vol" 'NR>1 && $1 == v {found=1} END{exit !found}'
+}
+
+if ! template_volume_present "$TEMPLATE"; then
+	tpl_storage="${TEMPLATE%%:*}"
+	tpl_file="${TEMPLATE##*/}"
+	echo "Template '$TEMPLATE' is not downloaded on this host."
+
+	# Verify GitHub… err, Proxmox knows about this template name at all
+	if ! pveam available --section system 2>/dev/null | awk '{print $2}' | grep -qx "$tpl_file"; then
+		echo "And it's not in 'pveam available --section system' either." >&2
+		echo "Try: pveam update && pveam available --section system | grep debian-12-standard" >&2
+		echo "Then re-run with TEMPLATE='${tpl_storage}:vztmpl/<exact-filename>'." >&2
+		exit 1
+	fi
+
+	do_download=0
+	if (( AUTO_DOWNLOAD_TEMPLATE )); then
+		if (( INTERACTIVE )); then
+			read -rp "Download it now via 'pveam download $tpl_storage $tpl_file'? [Y/n]: " ans </dev/tty
+			[[ "$ans" =~ ^[Nn] ]] || do_download=1
+		else
+			do_download=1
+		fi
+	fi
+
+	if (( do_download )); then
+		echo "Downloading template (~120 MB)…"
+		pveam download "$tpl_storage" "$tpl_file"
+	else
+		echo "Aborting. Run this on the host first, then retry:" >&2
+		echo "  pveam download $tpl_storage $tpl_file" >&2
+		exit 1
+	fi
 fi
 
 NET="name=eth0,bridge=${BRIDGE},ip=${IP}"
