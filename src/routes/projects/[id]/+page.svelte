@@ -1,11 +1,16 @@
 <script lang="ts">
 	import { fmtMoneyPrecise, fmtPercent } from '$lib/format';
+	import TagPicker from '$lib/components/TagPicker.svelte';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	let editing = $state(false);
 
 	const r = $derived(data.rollup);
+	const tagsById = $derived(new Map(data.tags.map((t) => [t.id, t])));
+	const projectTagsList = $derived(
+		data.tagIds.map((id) => tagsById.get(id)).filter((t): t is NonNullable<typeof t> => !!t)
+	);
 </script>
 
 <svelte:head><title>{r.project.name} · devcost</title></svelte:head>
@@ -18,6 +23,16 @@
 			<span class="badge {r.project.status === 'active' ? 'badge-shared' : ''}">{r.project.status}</span>
 		</h1>
 		{#if r.project.notes}<p class="text-sm text-fg-muted mt-1">{r.project.notes}</p>{/if}
+		{#if projectTagsList.length > 0}
+			<div class="flex flex-wrap gap-1 mt-2">
+				{#each projectTagsList as t}
+					<span class="chip chip-readonly">
+						<span class="text-fg-subtle text-[10px] uppercase tracking-wide">{t.category}</span>
+						<span>{t.name}</span>
+					</span>
+				{/each}
+			</div>
+		{/if}
 	</div>
 	<button class="btn" onclick={() => (editing = !editing)}>{editing ? 'Cancel' : 'Edit'}</button>
 </div>
@@ -37,6 +52,10 @@
 					<option value="paused" selected={r.project.status === 'paused'}>Paused</option>
 					<option value="archived" selected={r.project.status === 'archived'}>Archived</option>
 				</select>
+			</div>
+			<div class="sm:col-span-2">
+				<div class="label">Tags</div>
+				<TagPicker tags={data.tags} initial={data.tagIds} />
 			</div>
 			<div class="sm:col-span-2">
 				<label for="notes" class="label">Notes</label>
@@ -61,7 +80,7 @@
 	</div>
 {/if}
 
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+<div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
 	<div class="card card-body">
 		<div class="text-xs text-fg-subtle">Direct</div>
 		<div class="text-lg font-semibold tabular-nums">{fmtMoneyPrecise(r.directMonthly)}</div>
@@ -73,6 +92,10 @@
 	<div class="card card-body">
 		<div class="text-xs text-fg-subtle">Global</div>
 		<div class="text-lg font-semibold tabular-nums">{fmtMoneyPrecise(r.globalMonthly)}</div>
+	</div>
+	<div class="card card-body">
+		<div class="text-xs text-fg-subtle">Tag</div>
+		<div class="text-lg font-semibold tabular-nums">{fmtMoneyPrecise(r.tagMonthly)}</div>
 	</div>
 	<div class="card card-body bg-bg-muted">
 		<div class="text-xs text-fg-subtle">Total / month</div>

@@ -1,17 +1,20 @@
 <script lang="ts">
 	import { fmtMoneyPrecise } from '$lib/format';
 	import AllocationEditor from '$lib/components/AllocationEditor.svelte';
+	import TagPicker from '$lib/components/TagPicker.svelte';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	let showNew = $state(false);
-	let scope = $state<'global' | 'shared' | 'project'>('global');
+	let scope = $state<'global' | 'shared' | 'project' | 'tag'>('global');
 	let billing = $state<'monthly' | 'yearly' | 'one_time'>('monthly');
 	let amount = $state(0);
 
 	const monthlyPreview = $derived(
 		billing === 'monthly' ? amount : billing === 'yearly' ? amount / 12 : 0
 	);
+
+	const tagsById = $derived(new Map(data.tags.map((t) => [t.id, t])));
 </script>
 
 <svelte:head><title>Costs · devcost</title></svelte:head>
@@ -65,6 +68,7 @@
 					<option value="global">Global — split across all active projects</option>
 					<option value="shared">Shared — weighted across selected</option>
 					<option value="project">Project — single project</option>
+					<option value="tag">Tag — split across projects with matching tags</option>
 				</select>
 			</div>
 			<div class="sm:col-span-4 flex items-end text-xs text-fg-muted">
@@ -85,6 +89,11 @@
 				<div class="sm:col-span-6">
 					<div class="label">Allocation across projects</div>
 					<AllocationEditor projects={data.projects} />
+				</div>
+			{:else if scope === 'tag'}
+				<div class="sm:col-span-6">
+					<div class="label">Tags (cost spreads equally across active projects matching any of these)</div>
+					<TagPicker tags={data.tags} />
 				</div>
 			{/if}
 
@@ -123,6 +132,16 @@
 					<td>
 						<a href="/costs/{c.id}" class="text-fg-base hover:text-accent font-medium">{c.name}</a>
 						{#if c.notes}<div class="text-xs text-fg-subtle truncate max-w-md">{c.notes}</div>{/if}
+						{#if c.scope === 'tag' && c.tagIds.length > 0}
+							<div class="flex flex-wrap gap-1 mt-1">
+								{#each c.tagIds as tid}
+									{@const t = tagsById.get(tid)}
+									{#if t}
+										<span class="chip chip-readonly">{t.name}</span>
+									{/if}
+								{/each}
+							</div>
+						{/if}
 					</td>
 					<td class="text-fg-muted">{c.vendor ?? '—'}</td>
 					<td><span class="badge badge-{c.scope}">{c.scope}</span></td>

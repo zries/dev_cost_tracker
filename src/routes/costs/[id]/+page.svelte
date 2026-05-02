@@ -1,14 +1,16 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { fmtMoneyPrecise } from '$lib/format';
 	import AllocationEditor from '$lib/components/AllocationEditor.svelte';
+	import TagPicker from '$lib/components/TagPicker.svelte';
 	import type { PageData, ActionData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const c = $derived(data.cost);
-	let scope = $state(data.cost.scope);
-	let billing = $state(data.cost.billingCycle);
-	let amount = $state(data.cost.amount);
+	let scope = $state(untrack(() => data.cost.scope));
+	let billing = $state(untrack(() => data.cost.billingCycle));
+	let amount = $state(untrack(() => data.cost.amount));
 
 	const monthlyPreview = $derived(
 		billing === 'monthly' ? amount : billing === 'yearly' ? amount / 12 : 0
@@ -86,6 +88,7 @@
 				<option value="global">Global</option>
 				<option value="shared">Shared</option>
 				<option value="project">Project</option>
+				<option value="tag">Tag</option>
 			</select>
 		</div>
 		<div class="sm:col-span-2 flex items-end text-xs text-fg-muted">
@@ -110,6 +113,11 @@
 			<div class="sm:col-span-6">
 				<div class="label">Allocation across projects</div>
 				<AllocationEditor projects={data.projects} initial={initialAllocations} />
+			</div>
+		{:else if scope === 'tag'}
+			<div class="sm:col-span-6">
+				<div class="label">Tags (cost spreads equally across active projects matching any of these)</div>
+				<TagPicker tags={data.tags} initial={data.tagIds} />
 			</div>
 		{/if}
 

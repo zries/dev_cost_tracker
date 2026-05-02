@@ -8,7 +8,8 @@
 	const nav = [
 		{ href: '/', label: 'Dashboard' },
 		{ href: '/projects', label: 'Projects' },
-		{ href: '/costs', label: 'Costs' }
+		{ href: '/costs', label: 'Costs' },
+		{ href: '/tags', label: 'Tags' }
 	];
 
 	function isActive(href: string, path: string): boolean {

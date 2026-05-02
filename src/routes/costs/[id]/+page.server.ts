@@ -1,8 +1,8 @@
 import { error, fail, redirect, type Actions } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { costs, projects, costAllocations } from '$lib/server/db/schema';
-import { toMonthly } from '$lib/server/rollup';
+import { costs, projects, costAllocations, tags } from '$lib/server/db/schema';
+import { toMonthly, getCostTags, setCostTags } from '$lib/server/rollup';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -17,8 +17,10 @@ export const load: PageServerLoad = async ({ params }) => {
 		.from(costAllocations)
 		.where(eq(costAllocations.costId, id))
 		.all();
+	const allTags = db.select().from(tags).all();
+	const tagIds = getCostTags(id);
 
-	return { cost, projects: allProjects, allocations };
+	return { cost, projects: allProjects, allocations, tags: allTags, tagIds };
 };
 
 function parseAllocations(form: FormData): { projectId: number; weight: number }[] {
@@ -34,6 +36,15 @@ function parseAllocations(form: FormData): { projectId: number; weight: number }
 	return out;
 }
 
+function parseTagIds(form: FormData): number[] {
+	const out = new Set<number>();
+	for (const v of form.getAll('tag_ids')) {
+		const n = Number(v);
+		if (Number.isFinite(n) && n > 0) out.add(n);
+	}
+	return [...out];
+}
+
 export const actions: Actions = {
 	update: async ({ request, params }) => {
 		const id = Number(params.id);
@@ -47,14 +58,17 @@ export const actions: Actions = {
 		const notes = String(data.get('notes') ?? '').trim() || null;
 		const active = data.get('active') === 'on';
 		const projectId = Number(data.get('project_id'));
+		const tagIds = parseTagIds(data);
 
 		if (!name) return fail(400, { error: 'Name is required.' });
-		if (!['global', 'shared', 'project'].includes(scope))
+		if (!['global', 'shared', 'project', 'tag'].includes(scope))
 			return fail(400, { error: 'Invalid scope.' });
 		if (!['monthly', 'yearly', 'one_time'].includes(billingCycle))
 			return fail(400, { error: 'Invalid billing cycle.' });
 		if (!Number.isFinite(amount) || amount < 0)
 			return fail(400, { error: 'Amount must be a non-negative number.' });
+		if (scope === 'tag' && tagIds.length === 0)
+			return fail(400, { error: 'Pick at least one tag for tag-scoped costs.' });
 
 		const monthlyAmount = toMonthly(amount, billingCycle as 'monthly');
 
@@ -88,6 +102,8 @@ export const actions: Actions = {
 				}
 			}
 		});
+
+		setCostTags(id, scope === 'tag' ? tagIds : []);
 
 		throw redirect(303, `/costs/${id}`);
 	},

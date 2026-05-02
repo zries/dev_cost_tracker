@@ -61,5 +61,28 @@ export function initSchema(): void {
 		CREATE UNIQUE INDEX IF NOT EXISTS cost_allocations_cost_project_idx ON cost_allocations(cost_id, project_id);
 		CREATE INDEX IF NOT EXISTS cost_allocations_cost_idx ON cost_allocations(cost_id);
 		CREATE INDEX IF NOT EXISTS cost_allocations_project_idx ON cost_allocations(project_id);
+
+		CREATE TABLE IF NOT EXISTS tags (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			category TEXT NOT NULL,
+			created_at INTEGER NOT NULL DEFAULT (unixepoch())
+		);
+		CREATE UNIQUE INDEX IF NOT EXISTS tags_name_idx ON tags(name);
+		CREATE INDEX IF NOT EXISTS tags_category_idx ON tags(category);
+
+		CREATE TABLE IF NOT EXISTS project_tags (
+			project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+			tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+			PRIMARY KEY (project_id, tag_id)
+		);
+		CREATE INDEX IF NOT EXISTS project_tags_tag_idx ON project_tags(tag_id);
+
+		CREATE TABLE IF NOT EXISTS cost_tags (
+			cost_id INTEGER NOT NULL REFERENCES costs(id) ON DELETE CASCADE,
+			tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+			PRIMARY KEY (cost_id, tag_id)
+		);
+		CREATE INDEX IF NOT EXISTS cost_tags_tag_idx ON cost_tags(tag_id);
 	`);
 }
