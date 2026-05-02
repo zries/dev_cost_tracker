@@ -29,6 +29,10 @@
 				<label for="name" class="label">Name</label>
 				<input id="name" name="name" type="text" required class="input" />
 			</div>
+			<div class="sm:col-span-2">
+				<label for="url" class="label">URL <span class="text-fg-subtle font-normal">(optional)</span></label>
+				<input id="url" name="url" type="url" class="input" placeholder="https://…" />
+			</div>
 			<div>
 				<label for="status" class="label">Status</label>
 				<select id="status" name="status" class="select">
@@ -73,7 +77,12 @@
 			{#each data.projects as p}
 				<tr>
 					<td>
-						<a href="/projects/{p.id}" class="text-fg-base hover:text-accent font-medium">{p.name}</a>
+						<div class="flex items-center gap-1.5">
+							<a href="/projects/{p.id}" class="text-fg-base hover:text-accent font-medium">{p.name}</a>
+							{#if p.url}
+								<a href={p.url} target="_blank" rel="noopener" class="text-fg-subtle hover:text-accent text-xs" title={p.url}>↗</a>
+							{/if}
+						</div>
 						{#if p.notes}
 							<div class="text-xs text-fg-subtle truncate max-w-md">{p.notes}</div>
 						{/if}

@@ -29,6 +29,7 @@ export const actions: Actions = {
 		const id = Number(params.id);
 		const data = await request.formData();
 		const name = String(data.get('name') ?? '').trim();
+		const url = String(data.get('url') ?? '').trim() || null;
 		const status = String(data.get('status') ?? '');
 		const notes = String(data.get('notes') ?? '').trim() || null;
 		const tagIds = parseTagIds(data);
@@ -39,7 +40,7 @@ export const actions: Actions = {
 
 		try {
 			db.update(projects)
-				.set({ name, status: status as 'active', notes, updatedAt: Math.floor(Date.now() / 1000) })
+				.set({ name, url, status: status as 'active', notes, updatedAt: Math.floor(Date.now() / 1000) })
 				.where(eq(projects.id, id))
 				.run();
 			setProjectTags(id, tagIds);

@@ -22,6 +22,7 @@ export const sessions = sqliteTable('sessions', {
 export const projects = sqliteTable('projects', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	name: text('name').notNull(),
+	url: text('url'),
 	status: text('status', { enum: ['active', 'paused', 'archived'] })
 		.notNull()
 		.default('active'),
@@ -43,6 +44,7 @@ export const costs = sqliteTable('costs', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	name: text('name').notNull(),
 	vendor: text('vendor'),
+	url: text('url'),
 	scope: text('scope', { enum: ['global', 'shared', 'project', 'tag'] }).notNull(),
 	billingCycle: text('billing_cycle', { enum: ['monthly', 'yearly', 'one_time'] })
 		.notNull()

@@ -41,6 +41,10 @@
 				<label for="vendor" class="label">Vendor</label>
 				<input id="vendor" name="vendor" type="text" class="input" placeholder="Anthropic, Vercel, …" />
 			</div>
+			<div class="sm:col-span-6">
+				<label for="url" class="label">URL <span class="text-fg-subtle font-normal">(optional, e.g. billing dashboard)</span></label>
+				<input id="url" name="url" type="url" class="input" placeholder="https://…" />
+			</div>
 
 			<div class="sm:col-span-2">
 				<label for="amount" class="label">Amount</label>
@@ -130,7 +134,12 @@
 			{#each data.costs as c}
 				<tr class={c.active ? '' : 'opacity-60'}>
 					<td>
-						<a href="/costs/{c.id}" class="text-fg-base hover:text-accent font-medium">{c.name}</a>
+						<div class="flex items-center gap-1.5">
+							<a href="/costs/{c.id}" class="text-fg-base hover:text-accent font-medium">{c.name}</a>
+							{#if c.url}
+								<a href={c.url} target="_blank" rel="noopener" class="text-fg-subtle hover:text-accent text-xs" title={c.url}>↗</a>
+							{/if}
+						</div>
 						{#if c.notes}<div class="text-xs text-fg-subtle truncate max-w-md">{c.notes}</div>{/if}
 						{#if c.scope === 'tag' && c.tagIds.length > 0}
 							<div class="flex flex-wrap gap-1 mt-1">

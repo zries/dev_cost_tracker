@@ -16,6 +16,8 @@
 #   ADMIN_USERNAME=admin
 #   ADMIN_PASSWORD=admin
 #   NODE_VERSION=20                      NodeSource major version
+#   BACKUP_KEEP_DAYS=14                  How many daily SQLite backups to retain (0 disables backups)
+#   BACKUP_HOUR=3                        Hour-of-day for the backup cron (0-23)
 
 set -euo pipefail
 
@@ -29,6 +31,8 @@ REPO_BRANCH="${REPO_BRANCH:-main}"
 NODE_VERSION="${NODE_VERSION:-20}"
 ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin}"
+BACKUP_KEEP_DAYS="${BACKUP_KEEP_DAYS:-14}"
+BACKUP_HOUR="${BACKUP_HOUR:-3}"
 
 if [[ $EUID -ne 0 ]]; then
 	echo "This script must be run as root." >&2
@@ -40,7 +44,7 @@ log() { printf '\033[1;34m[devcost]\033[0m %s\n' "$*"; }
 log "Updating apt and installing base packages…"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq curl ca-certificates git build-essential python3 sqlite3
+apt-get install -y -qq curl ca-certificates git build-essential python3 sqlite3 cron
 
 if ! command -v node >/dev/null 2>&1 || [[ "$(node -v)" != v${NODE_VERSION}.* ]]; then
 	log "Installing Node.js ${NODE_VERSION}.x via NodeSource…"
@@ -54,9 +58,9 @@ if ! id devcost >/dev/null 2>&1; then
 fi
 
 log "Preparing directories…"
-mkdir -p "$APP_DIR" "$DATA_DIR" "$ETC_DIR"
+mkdir -p "$APP_DIR" "$DATA_DIR" "$DATA_DIR/backups" "$ETC_DIR"
 chown -R devcost:devcost "$APP_DIR" "$DATA_DIR"
-chmod 750 "$DATA_DIR"
+chmod 750 "$DATA_DIR" "$DATA_DIR/backups"
 
 if [[ -d "$APP_DIR/.git" ]]; then
 	log "Updating existing checkout in $APP_DIR…"
@@ -102,6 +106,47 @@ install -m 0644 "$APP_DIR/deploy/devcost.service" /etc/systemd/system/devcost.se
 systemctl daemon-reload
 systemctl enable devcost.service
 systemctl restart devcost.service
+
+log "Installing backup script and cron job…"
+cat > /usr/local/sbin/devcost-backup <<EOF
+#!/usr/bin/env bash
+# Daily SQLite backup for devcost. Installed by deploy/install.sh.
+set -euo pipefail
+DB="${DATA_DIR}/devcost.sqlite"
+DEST="${DATA_DIR}/backups"
+KEEP_DAYS=${BACKUP_KEEP_DAYS}
+
+if [[ ! -f "\$DB" ]]; then
+	echo "devcost-backup: DB not found at \$DB" >&2
+	exit 1
+fi
+
+mkdir -p "\$DEST"
+out="\$DEST/devcost-\$(date +%F-%H%M).sqlite"
+sqlite3 "\$DB" ".backup '\$out'"
+gzip -f "\$out"
+
+if (( KEEP_DAYS > 0 )); then
+	find "\$DEST" -name 'devcost-*.sqlite.gz' -type f -mtime +\$KEEP_DAYS -delete
+fi
+EOF
+chmod 0755 /usr/local/sbin/devcost-backup
+chown root:root /usr/local/sbin/devcost-backup
+
+if (( BACKUP_KEEP_DAYS > 0 )); then
+	cat > /etc/cron.d/devcost-backup <<EOF
+# devcost daily SQLite backup. Edit BACKUP_HOUR / BACKUP_KEEP_DAYS and rerun install.sh to change.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 ${BACKUP_HOUR} * * * devcost /usr/local/sbin/devcost-backup 2>&1 | /usr/bin/logger -t devcost-backup
+EOF
+	chmod 0644 /etc/cron.d/devcost-backup
+	systemctl enable --now cron.service >/dev/null 2>&1 || true
+	log "Backups: daily at ${BACKUP_HOUR}:00, retained for ${BACKUP_KEEP_DAYS} days, in ${DATA_DIR}/backups/"
+else
+	rm -f /etc/cron.d/devcost-backup
+	log "Backups: disabled (BACKUP_KEEP_DAYS=0). Removed any existing cron job."
+fi
 
 sleep 2
 if systemctl is-active --quiet devcost.service; then

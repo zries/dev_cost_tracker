@@ -42,6 +42,7 @@ export const actions: Actions = {
 	create: async ({ request }) => {
 		const data = await request.formData();
 		const name = String(data.get('name') ?? '').trim();
+		const url = String(data.get('url') ?? '').trim() || null;
 		const status = String(data.get('status') ?? 'active');
 		const notes = String(data.get('notes') ?? '').trim() || null;
 		const tagIds = parseTagIds(data);
@@ -53,7 +54,7 @@ export const actions: Actions = {
 		try {
 			const inserted = db
 				.insert(projects)
-				.values({ name, status: status as 'active', notes })
+				.values({ name, url, status: status as 'active', notes })
 				.returning({ id: projects.id })
 				.get();
 			if (tagIds.length > 0) setProjectTags(inserted.id, tagIds);

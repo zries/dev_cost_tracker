@@ -20,6 +20,9 @@
 		<a href="/projects" class="text-xs text-fg-subtle hover:text-fg-base">← Projects</a>
 		<h1 class="text-xl font-semibold mt-1 flex items-center gap-2">
 			{r.project.name}
+			{#if r.project.url}
+				<a href={r.project.url} target="_blank" rel="noopener" class="text-fg-subtle hover:text-accent text-sm" title={r.project.url}>↗</a>
+			{/if}
 			<span class="badge {r.project.status === 'active' ? 'badge-shared' : ''}">{r.project.status}</span>
 		</h1>
 		{#if r.project.notes}<p class="text-sm text-fg-muted mt-1">{r.project.notes}</p>{/if}
@@ -44,6 +47,10 @@
 			<div class="sm:col-span-2">
 				<label for="name" class="label">Name</label>
 				<input id="name" name="name" type="text" required class="input" value={r.project.name} />
+			</div>
+			<div class="sm:col-span-2">
+				<label for="url" class="label">URL <span class="text-fg-subtle font-normal">(optional)</span></label>
+				<input id="url" name="url" type="url" class="input" value={r.project.url ?? ''} placeholder="https://…" />
 			</div>
 			<div>
 				<label for="status" class="label">Status</label>

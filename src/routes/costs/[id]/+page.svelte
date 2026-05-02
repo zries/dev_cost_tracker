@@ -28,6 +28,9 @@
 	<a href="/costs" class="text-xs text-fg-subtle hover:text-fg-base">← Costs</a>
 	<h1 class="text-xl font-semibold mt-1 flex items-center gap-2">
 		{c.name}
+		{#if c.url}
+			<a href={c.url} target="_blank" rel="noopener" class="text-fg-subtle hover:text-accent text-sm" title={c.url}>↗</a>
+		{/if}
 		<span class="badge badge-{c.scope}">{c.scope}</span>
 		{#if !c.active}<span class="badge">inactive</span>{/if}
 	</h1>
@@ -63,6 +66,10 @@
 		<div class="sm:col-span-3">
 			<label for="vendor" class="label">Vendor</label>
 			<input id="vendor" name="vendor" type="text" class="input" value={c.vendor ?? ''} />
+		</div>
+		<div class="sm:col-span-6">
+			<label for="url" class="label">URL <span class="text-fg-subtle font-normal">(optional, e.g. billing dashboard)</span></label>
+			<input id="url" name="url" type="url" class="input" value={c.url ?? ''} placeholder="https://…" />
 		</div>
 
 		<div class="sm:col-span-2">

@@ -63,6 +63,7 @@ export const actions: Actions = {
 		const data = await request.formData();
 		const name = String(data.get('name') ?? '').trim();
 		const vendor = String(data.get('vendor') ?? '').trim() || null;
+		const url = String(data.get('url') ?? '').trim() || null;
 		const scope = String(data.get('scope') ?? '');
 		const billingCycle = String(data.get('billing_cycle') ?? 'monthly');
 		const amount = Number(data.get('amount'));
@@ -91,6 +92,7 @@ export const actions: Actions = {
 					.values({
 						name,
 						vendor,
+						url,
 						scope: scope as 'global',
 						billingCycle: billingCycle as 'monthly',
 						amount,
