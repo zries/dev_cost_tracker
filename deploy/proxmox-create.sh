@@ -9,7 +9,7 @@
 #
 # Tunable env vars (all optional):
 #   CTID=200                    Container ID
-#   HOSTNAME=devcost
+#   CT_HOSTNAME=devcost         Container hostname (also the Proxmox display name)
 #   STORAGE=local-lvm           Proxmox storage pool for the rootfs
 #   DISK_GB=4
 #   MEMORY_MB=512
@@ -55,7 +55,9 @@ if [[ ! -t 0 ]]; then
 fi
 
 CTID="${CTID:-200}"
-HOSTNAME="${HOSTNAME:-devcost}"
+# NOTE: do not use the bare name HOSTNAME here — bash auto-populates it with
+# the host's own hostname, which would shadow our default.
+CT_HOSTNAME="${CT_HOSTNAME:-devcost}"
 STORAGE="${STORAGE:-local-lvm}"
 DISK_GB="${DISK_GB:-4}"
 MEMORY_MB="${MEMORY_MB:-512}"
@@ -132,7 +134,7 @@ if (( INTERACTIVE )); then
 
 	echo "── Container ──"
 	ask CTID         "Container ID (CTID)"
-	ask HOSTNAME     "Hostname"
+	ask CT_HOSTNAME  "Hostname (LXC display name)"
 	ask CORES        "vCPU cores"
 	ask MEMORY_MB    "Memory (MB)"
 	ask DISK_GB      "Root disk (GB)"
@@ -186,7 +188,7 @@ cat <<SUMMARY
  Review settings
 ==========================================
  CTID:           $CTID
- Hostname:       $HOSTNAME
+ Hostname:       $CT_HOSTNAME
  Cores / RAM:    $CORES vCPU / ${MEMORY_MB} MB
  Disk:           ${DISK_GB} GB on $STORAGE
  Template:       $TEMPLATE
@@ -257,9 +259,9 @@ fi
 
 NET="name=eth0,bridge=${BRIDGE},ip=${IP}"
 
-echo "Creating LXC $CTID ($HOSTNAME)…"
+echo "Creating LXC $CTID ($CT_HOSTNAME)…"
 pct create "$CTID" "$TEMPLATE" \
-	--hostname "$HOSTNAME" \
+	--hostname "$CT_HOSTNAME" \
 	--cores "$CORES" \
 	--memory "$MEMORY_MB" \
 	--swap 256 \
@@ -300,7 +302,7 @@ echo "=========================================="
 echo " devcost LXC ready"
 echo "=========================================="
 echo " CTID:        $CTID"
-echo " Hostname:    $HOSTNAME"
+echo " Hostname:    $CT_HOSTNAME"
 echo " Container IP: ${CT_IP:-<unknown — check pct exec $CTID -- ip a>}"
 echo " URL:         http://${CT_IP:-<container-ip>}:${PORT}"
 echo " Login:       ${ADMIN_USERNAME} / ${ADMIN_PASSWORD}  (change after first login)"
