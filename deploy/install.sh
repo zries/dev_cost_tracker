@@ -64,8 +64,8 @@ chmod 750 "$DATA_DIR" "$DATA_DIR/backups"
 
 if [[ -d "$APP_DIR/.git" ]]; then
 	log "Updating existing checkout in $APP_DIR…"
-	sudo -u devcost git -C "$APP_DIR" fetch --depth=1 origin "$REPO_BRANCH"
-	sudo -u devcost git -C "$APP_DIR" checkout -B "$REPO_BRANCH" "origin/$REPO_BRANCH"
+	runuser -u devcost -- git -C "$APP_DIR" fetch --depth=1 origin "$REPO_BRANCH"
+	runuser -u devcost -- git -C "$APP_DIR" checkout -B "$REPO_BRANCH" "origin/$REPO_BRANCH"
 elif [[ -f "$(dirname "$0")/../package.json" ]]; then
 	log "Copying local source into $APP_DIR…"
 	rsync -a --delete --exclude node_modules --exclude build --exclude .git \
@@ -73,14 +73,14 @@ elif [[ -f "$(dirname "$0")/../package.json" ]]; then
 	chown -R devcost:devcost "$APP_DIR"
 else
 	log "Cloning $REPO_URL ($REPO_BRANCH) into $APP_DIR…"
-	sudo -u devcost git clone --depth=1 --branch "$REPO_BRANCH" "$REPO_URL" "$APP_DIR"
+	runuser -u devcost -- git clone --depth=1 --branch "$REPO_BRANCH" "$REPO_URL" "$APP_DIR"
 fi
 
 log "Installing npm dependencies (this builds better-sqlite3 from source — ~1 min)…"
-sudo -u devcost --preserve-env=PATH bash -c "cd $APP_DIR && npm ci --no-audit --no-fund"
+runuser -u devcost -- bash -c "cd $APP_DIR && npm ci --no-audit --no-fund"
 
 log "Building app…"
-sudo -u devcost --preserve-env=PATH bash -c "cd $APP_DIR && npm run build"
+runuser -u devcost -- bash -c "cd $APP_DIR && npm run build"
 
 if [[ ! -f "$ETC_DIR/devcost.env" ]]; then
 	log "Writing initial config to $ETC_DIR/devcost.env…"
