@@ -5,12 +5,12 @@ Two scripts:
 - `proxmox-create.sh` — run on the **Proxmox host**. Creates a Debian 12 LXC, then runs `install.sh` inside it.
 - `install.sh` — run **inside** the LXC (or any Debian 12 box). Idempotent, safe to re-run for upgrades.
 
-Both honor a `PORT=` env var. Default is `8080`. Bind address is `HOST=0.0.0.0` so the app is reachable on the LAN.
+Both honor a `PORT=` env var. Default is `6767`. Bind address is `HOST=0.0.0.0` so the app is reachable on the LAN.
 
 ## One-shot from Proxmox host
 
 ```bash
-# Defaults: CTID 200, dhcp, 512 MiB RAM, 1 core, 4 GiB disk, port 8080
+# Defaults: CTID 200, dhcp, 512 MiB RAM, 1 core, 4 GiB disk, port 6767
 bash deploy/proxmox-create.sh
 
 # Custom: pin a static IP and a different port
@@ -24,7 +24,7 @@ CTID=210 \
 
 ```bash
 # Inside the container, as root
-PORT=8080 bash deploy/install.sh
+PORT=6767 bash deploy/install.sh
 ```
 
 ## Changing the port later

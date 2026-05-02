@@ -21,7 +21,7 @@
 #   TEMPLATE_STORAGE=local      Storage that holds vztmpl files (where templates live)
 #   AUTO_DOWNLOAD_TEMPLATE=1    Auto-download missing template (set 0 to refuse)
 #   PASSWORD=                   root password for the container; auto-generated if empty
-#   PORT=8080                   App port (passed through to install.sh)
+#   PORT=6767                   App port (passed through to install.sh)
 #   ADMIN_USERNAME=admin
 #   ADMIN_PASSWORD=admin
 #   REPO_URL=https://github.com/zries/dev_cost_tracker.git
@@ -68,7 +68,7 @@ TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-local}"
 TEMPLATE_FALLBACK="debian-12-standard_12.7-1_amd64.tar.zst"
 AUTO_DOWNLOAD_TEMPLATE="${AUTO_DOWNLOAD_TEMPLATE:-1}"
 PASSWORD="${PASSWORD:-}"
-PORT="${PORT:-8080}"
+PORT="${PORT:-6767}"
 ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin}"
 REPO_URL="${REPO_URL:-https://github.com/zries/dev_cost_tracker.git}"
@@ -220,7 +220,8 @@ fi
 
 # Pre-flight: make sure the template volume exists locally; offer to download.
 template_volume_present() {
-	local vol="$1" storage="${vol%%:*}" file="${vol##*/}"
+	local vol="$1"
+	local storage="${vol%%:*}"
 	pveam list "$storage" 2>/dev/null | awk -v v="$vol" 'NR>1 && $1 == v {found=1} END{exit !found}'
 }
 

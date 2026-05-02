@@ -30,10 +30,10 @@ First boot seeds an `admin / admin` user and prompts you to change the password.
 See [`deploy/README.md`](deploy/README.md). Short version, on the Proxmox host:
 
 ```bash
-bash deploy/proxmox-create.sh        # 512 MiB / 1 core / 4 GiB / port 8080
+bash deploy/proxmox-create.sh        # 512 MiB / 1 core / 4 GiB / port 6767
 ```
 
-Then open `http://<container-ip>:8080`. Log in as `admin / admin`.
+Then open `http://<container-ip>:6767`. Log in as `admin / admin`.
 
 ## How costs roll up
 
@@ -53,7 +53,7 @@ The dashboard shows totals per project and a grand total. Yearly costs are norma
 
 | Var | Default | Purpose |
 |---|---|---|
-| `PORT` | `8080` | HTTP port |
+| `PORT` | `6767` | HTTP port |
 | `HOST` | `0.0.0.0` | Bind address (set to `127.0.0.1` if fronted by a reverse proxy) |
 | `DATABASE_PATH` | `./data/devcost.sqlite` (dev) / `/var/lib/devcost/devcost.sqlite` (LXC) | SQLite file path |
 | `SESSION_SECRET` | none | 32+ byte secret. `openssl rand -hex 32` |

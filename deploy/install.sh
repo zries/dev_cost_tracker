@@ -7,7 +7,7 @@
 #   bash deploy/install.sh
 #
 # Environment overrides (all optional):
-#   PORT=8080                            Port to expose (default 8080)
+#   PORT=6767                            Port to expose (default 6767)
 #   HOST=0.0.0.0                         Bind address (default 0.0.0.0)
 #   REPO_URL=https://github.com/...      Git repo to clone (defaults to whatever this script lives in)
 #   REPO_BRANCH=main                     Branch to deploy
@@ -21,7 +21,7 @@
 
 set -euo pipefail
 
-PORT="${PORT:-8080}"
+PORT="${PORT:-6767}"
 HOST="${HOST:-0.0.0.0}"
 APP_DIR="${APP_DIR:-/opt/devcost}"
 DATA_DIR="${DATA_DIR:-/var/lib/devcost}"
