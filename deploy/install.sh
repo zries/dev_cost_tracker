@@ -88,15 +88,19 @@ runuser -u devcost -- bash -c "cd $APP_DIR && npm ci --no-audit --no-fund"
 log "Building app…"
 runuser -u devcost -- bash -c "cd $APP_DIR && npm run build"
 
+gen_secret() { openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | xxd -p -c 64; }
+
 if [[ ! -f "$ETC_DIR/devcost.env" ]]; then
 	log "Writing initial config to $ETC_DIR/devcost.env…"
-	SESSION_SECRET="$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | xxd -p -c 64)"
+	SESSION_SECRET="$(gen_secret)"
+	DEVCOST_SECRET_KEY="$(gen_secret)"
 	cat > "$ETC_DIR/devcost.env" <<EOF
 PORT=${PORT}
 HOST=${HOST}
 NODE_ENV=production
 DATABASE_PATH=${DATA_DIR}/devcost.sqlite
 SESSION_SECRET=${SESSION_SECRET}
+DEVCOST_SECRET_KEY=${DEVCOST_SECRET_KEY}
 ADMIN_USERNAME=${ADMIN_USERNAME}
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
 COOKIE_SECURE=false
@@ -112,6 +116,13 @@ else
 		sed -i "s/^UPDATER_MODE=.*/UPDATER_MODE=${UPDATER_MODE}/" "$ETC_DIR/devcost.env"
 	else
 		echo "UPDATER_MODE=${UPDATER_MODE}" >> "$ETC_DIR/devcost.env"
+	fi
+	# Backfill DEVCOST_SECRET_KEY for installs that pre-date the integrations
+	# feature. Never overwrite an existing value — encrypted API credentials
+	# in the DB are bound to it and would become permanently undecryptable.
+	if ! grep -q '^DEVCOST_SECRET_KEY=' "$ETC_DIR/devcost.env"; then
+		log "Adding DEVCOST_SECRET_KEY (used to encrypt API credentials for live-usage integrations)…"
+		echo "DEVCOST_SECRET_KEY=$(gen_secret)" >> "$ETC_DIR/devcost.env"
 	fi
 fi
 
