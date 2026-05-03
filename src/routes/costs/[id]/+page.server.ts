@@ -3,6 +3,15 @@ import { eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { costs, projects, costAllocations, tags } from '$lib/server/db/schema';
 import { toMonthly, getCostTags, setCostTags } from '$lib/server/rollup';
+import {
+	getIntegrationStatus,
+	isCryptoConfigured,
+	providerOptions,
+	refreshUsage,
+	setIntegration,
+	clearCredential,
+	validateAndStore
+} from '$lib/server/integrations';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -20,7 +29,16 @@ export const load: PageServerLoad = async ({ params }) => {
 	const allTags = db.select().from(tags).all();
 	const tagIds = getCostTags(id);
 
-	return { cost, projects: allProjects, allocations, tags: allTags, tagIds };
+	return {
+		cost,
+		projects: allProjects,
+		allocations,
+		tags: allTags,
+		tagIds,
+		integration: getIntegrationStatus(id),
+		providerOptions: providerOptions(),
+		cryptoConfigured: isCryptoConfigured()
+	};
 };
 
 function parseAllocations(form: FormData): { projectId: number; weight: number }[] {
@@ -113,5 +131,36 @@ export const actions: Actions = {
 		const id = Number(params.id);
 		db.delete(costs).where(eq(costs.id, id)).run();
 		throw redirect(303, '/costs');
+	},
+	connectIntegration: async ({ request, params }) => {
+		const id = Number(params.id);
+		const data = await request.formData();
+		const providerId = String(data.get('provider') ?? '').trim();
+		const apiKey = String(data.get('api_key') ?? '');
+		if (!providerId) return fail(400, { integrationError: 'Pick a provider.' });
+		if (!apiKey.trim()) return fail(400, { integrationError: 'API key is required.' });
+		if (!isCryptoConfigured()) {
+			return fail(400, {
+				integrationError:
+					'Server is missing DEVCOST_SECRET_KEY. Set it in /etc/devcost/devcost.env (32 random bytes hex) and restart.'
+			});
+		}
+		const result = await validateAndStore(id, providerId, apiKey);
+		if (!result.ok) return fail(400, { integrationError: result.error });
+		// Best-effort: pull a snapshot so the dashboard has data immediately.
+		await refreshUsage(id);
+		throw redirect(303, `/costs/${id}`);
+	},
+	disconnectIntegration: async ({ params }) => {
+		const id = Number(params.id);
+		clearCredential(id);
+		setIntegration(id, null);
+		throw redirect(303, `/costs/${id}`);
+	},
+	refreshIntegration: async ({ params }) => {
+		const id = Number(params.id);
+		const r = await refreshUsage(id);
+		if (!r.ok) return fail(400, { integrationError: r.error });
+		throw redirect(303, `/costs/${id}`);
 	}
 };

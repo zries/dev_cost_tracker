@@ -35,6 +35,42 @@ const MIGRATIONS: Migration[] = [
 				sqlite.exec(`ALTER TABLE costs ADD COLUMN url TEXT`);
 			}
 		}
+	},
+	{
+		name: '0002_add_cost_integrations',
+		up: () => {
+			if (!columnExists('costs', 'integration')) {
+				sqlite.exec(`ALTER TABLE costs ADD COLUMN integration TEXT`);
+			}
+			sqlite.exec(`CREATE INDEX IF NOT EXISTS costs_integration_idx ON costs(integration)`);
+
+			sqlite.exec(`
+				CREATE TABLE IF NOT EXISTS cost_credentials (
+					cost_id INTEGER PRIMARY KEY REFERENCES costs(id) ON DELETE CASCADE,
+					ciphertext TEXT NOT NULL,
+					iv TEXT NOT NULL,
+					auth_tag TEXT NOT NULL,
+					hint TEXT,
+					created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+					updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+				);
+			`);
+
+			sqlite.exec(`
+				CREATE TABLE IF NOT EXISTS cost_usage_snapshots (
+					cost_id INTEGER PRIMARY KEY REFERENCES costs(id) ON DELETE CASCADE,
+					period_start INTEGER NOT NULL,
+					period_end INTEGER NOT NULL,
+					actual_amount REAL NOT NULL DEFAULT 0,
+					projected_amount REAL NOT NULL DEFAULT 0,
+					currency TEXT NOT NULL DEFAULT 'USD',
+					breakdown TEXT,
+					status TEXT NOT NULL DEFAULT 'ok',
+					message TEXT,
+					fetched_at INTEGER NOT NULL DEFAULT (unixepoch())
+				);
+			`);
+		}
 	}
 ];
 

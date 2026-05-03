@@ -18,6 +18,10 @@
 #   NODE_VERSION=20                      NodeSource major version
 #   BACKUP_KEEP_DAYS=14                  How many daily SQLite backups to retain (0 disables backups)
 #   BACKUP_HOUR=3                        Hour-of-day for the backup cron (0-23)
+#   UPDATER_MODE=display                 'display' (default) shows update command in UI;
+#                                        'oneclick' enables an in-browser "Update now" button.
+#                                        Setting 'oneclick' installs sudo + a sudoers rule
+#                                        allowing the devcost user to run /usr/local/sbin/devcost-update.
 
 set -euo pipefail
 
@@ -33,6 +37,8 @@ ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin}"
 BACKUP_KEEP_DAYS="${BACKUP_KEEP_DAYS:-14}"
 BACKUP_HOUR="${BACKUP_HOUR:-3}"
+UPDATER_MODE="${UPDATER_MODE:-display}"
+case "$UPDATER_MODE" in display|oneclick) ;; *) echo "UPDATER_MODE must be 'display' or 'oneclick' (got: $UPDATER_MODE)" >&2; exit 2 ;; esac
 
 if [[ $EUID -ne 0 ]]; then
 	echo "This script must be run as root." >&2
@@ -94,11 +100,19 @@ SESSION_SECRET=${SESSION_SECRET}
 ADMIN_USERNAME=${ADMIN_USERNAME}
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
 COOKIE_SECURE=false
+UPDATER_MODE=${UPDATER_MODE}
 EOF
 	chmod 640 "$ETC_DIR/devcost.env"
 	chown root:devcost "$ETC_DIR/devcost.env"
 else
-	log "Existing $ETC_DIR/devcost.env detected — leaving it alone. Edit it manually if you want to change PORT, etc."
+	log "Existing $ETC_DIR/devcost.env detected — leaving most of it alone."
+	# Ensure UPDATER_MODE is present and reflects the current install invocation,
+	# so re-running with UPDATER_MODE=oneclick actually flips the live setting.
+	if grep -q '^UPDATER_MODE=' "$ETC_DIR/devcost.env"; then
+		sed -i "s/^UPDATER_MODE=.*/UPDATER_MODE=${UPDATER_MODE}/" "$ETC_DIR/devcost.env"
+	else
+		echo "UPDATER_MODE=${UPDATER_MODE}" >> "$ETC_DIR/devcost.env"
+	fi
 fi
 
 log "Installing systemd unit…"
@@ -146,6 +160,66 @@ EOF
 else
 	rm -f /etc/cron.d/devcost-backup
 	log "Backups: disabled (BACKUP_KEEP_DAYS=0). Removed any existing cron job."
+fi
+
+# In-browser one-click updater (opt-in). Installs sudo + a sudoers rule giving
+# the devcost user passwordless access to /usr/local/sbin/devcost-update only.
+if [[ "$UPDATER_MODE" == "oneclick" ]]; then
+	log "Installing one-click updater (UPDATER_MODE=oneclick)…"
+	if ! command -v sudo >/dev/null 2>&1; then
+		log "Installing sudo (required for one-click updater)…"
+		apt-get install -y -qq sudo
+	fi
+
+	cat > /usr/local/sbin/devcost-update <<EOF
+#!/usr/bin/env bash
+# Self-update helper for devcost. Triggered from the web UI when UPDATER_MODE=oneclick.
+# Runs as root (via sudoers rule). Backs up, pulls latest main, rebuilds, restarts.
+set -euo pipefail
+exec >>/var/log/devcost-update.log 2>&1
+echo "[\$(date -Is)] devcost-update started"
+
+APP_DIR=${APP_DIR}
+REPO_BRANCH=${REPO_BRANCH}
+
+# Pre-update backup (best effort — don't abort the upgrade if it fails)
+/usr/local/sbin/devcost-backup || echo "warn: pre-update backup failed"
+
+cd "\$APP_DIR"
+runuser -u devcost -- git fetch --depth=1 origin "\$REPO_BRANCH"
+runuser -u devcost -- git checkout -B "\$REPO_BRANCH" "origin/\$REPO_BRANCH"
+runuser -u devcost -- npm ci --no-audit --no-fund
+runuser -u devcost -- npm run build
+
+systemctl restart devcost.service
+echo "[\$(date -Is)] devcost-update finished"
+EOF
+	chmod 0755 /usr/local/sbin/devcost-update
+	chown root:root /usr/local/sbin/devcost-update
+
+	# sudoers drop-in. visudo -cf checks syntax before installing.
+	tmp_sudoers="$(mktemp)"
+	cat > "$tmp_sudoers" <<'EOF'
+# Allow the devcost system user to invoke /usr/local/sbin/devcost-update only,
+# with no password. Installed by deploy/install.sh when UPDATER_MODE=oneclick.
+devcost ALL=(root) NOPASSWD: /usr/local/sbin/devcost-update
+Defaults!/usr/local/sbin/devcost-update !requiretty
+EOF
+	if visudo -cf "$tmp_sudoers" >/dev/null; then
+		install -m 0440 -o root -g root "$tmp_sudoers" /etc/sudoers.d/devcost
+		rm -f "$tmp_sudoers"
+		log "One-click updater installed. The web UI will show an 'Update now' button."
+	else
+		rm -f "$tmp_sudoers"
+		echo "Generated sudoers file failed visudo syntax check — refusing to install." >&2
+		exit 1
+	fi
+else
+	# Tear down if the user previously enabled it and is now switching back to display
+	if [[ -f /etc/sudoers.d/devcost ]]; then
+		log "UPDATER_MODE=display — removing previous one-click updater files."
+		rm -f /etc/sudoers.d/devcost /usr/local/sbin/devcost-update
+	fi
 fi
 
 sleep 2

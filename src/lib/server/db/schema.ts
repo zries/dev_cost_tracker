@@ -56,12 +56,51 @@ export const costs = sqliteTable('costs', {
 	active: integer('active', { mode: 'boolean' }).notNull().default(true),
 	startedOn: text('started_on'),
 	endedOn: text('ended_on'),
+	/** Integration provider id (e.g. 'anthropic_api'). Null = no live usage. */
+	integration: text('integration'),
 	createdAt: integer('created_at').notNull().default(sql`(unixepoch())`),
 	updatedAt: integer('updated_at').notNull().default(sql`(unixepoch())`)
 }, (t) => ({
 	scopeIdx: index('costs_scope_idx').on(t.scope),
-	activeIdx: index('costs_active_idx').on(t.active)
+	activeIdx: index('costs_active_idx').on(t.active),
+	integrationIdx: index('costs_integration_idx').on(t.integration)
 }));
+
+/**
+ * Encrypted API credentials per cost. AES-256-GCM, key from DEVCOST_SECRET_KEY.
+ * Never logged, never returned to the client. Decrypt only at fetch time.
+ */
+export const costCredentials = sqliteTable('cost_credentials', {
+	costId: integer('cost_id')
+		.primaryKey()
+		.references(() => costs.id, { onDelete: 'cascade' }),
+	ciphertext: text('ciphertext').notNull(),
+	iv: text('iv').notNull(),
+	authTag: text('auth_tag').notNull(),
+	hint: text('hint'),
+	createdAt: integer('created_at').notNull().default(sql`(unixepoch())`),
+	updatedAt: integer('updated_at').notNull().default(sql`(unixepoch())`)
+});
+
+/**
+ * Latest fetched usage snapshot per cost. Overwrites in place — we don't keep
+ * history yet; the upstream provider already has it. status='ok' means the
+ * payload fields are populated; status='error' means message has the reason.
+ */
+export const costUsageSnapshots = sqliteTable('cost_usage_snapshots', {
+	costId: integer('cost_id')
+		.primaryKey()
+		.references(() => costs.id, { onDelete: 'cascade' }),
+	periodStart: integer('period_start').notNull(),
+	periodEnd: integer('period_end').notNull(),
+	actualAmount: real('actual_amount').notNull().default(0),
+	projectedAmount: real('projected_amount').notNull().default(0),
+	currency: text('currency').notNull().default('USD'),
+	breakdown: text('breakdown'),
+	status: text('status', { enum: ['ok', 'error'] }).notNull().default('ok'),
+	message: text('message'),
+	fetchedAt: integer('fetched_at').notNull().default(sql`(unixepoch())`)
+});
 
 export const costAllocations = sqliteTable('cost_allocations', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
@@ -120,6 +159,8 @@ export type CostAllocation = typeof costAllocations.$inferSelect;
 export type Tag = typeof tags.$inferSelect;
 export type ProjectTag = typeof projectTags.$inferSelect;
 export type CostTag = typeof costTags.$inferSelect;
+export type CostCredential = typeof costCredentials.$inferSelect;
+export type CostUsageSnapshot = typeof costUsageSnapshots.$inferSelect;
 
 export type Scope = Cost['scope'];
 export type BillingCycle = Cost['billingCycle'];

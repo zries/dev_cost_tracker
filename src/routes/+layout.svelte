@@ -2,6 +2,7 @@
 	import '../app.css';
 	import { page } from '$app/stores';
 	import Toaster from '$lib/components/Toaster.svelte';
+	import UpdateBanner from '$lib/components/UpdateBanner.svelte';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
@@ -21,6 +22,7 @@
 
 {#if data.user && !$page.url.pathname.startsWith('/login')}
 	<div class="min-h-full flex flex-col">
+		<UpdateBanner />
 		<header class="border-b border-border bg-bg-subtle">
 			<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14">
 				<div class="flex items-center gap-8">

@@ -4,7 +4,7 @@ import { getSessionUser, readSessionCookie, clearSessionCookie } from '$lib/serv
 
 await bootstrap();
 
-const PUBLIC_ROUTES = new Set(['/login']);
+const PUBLIC_ROUTES = new Set(['/login', '/api/health']);
 
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.user = null;

@@ -99,6 +99,42 @@ systemctl restart devcost
 | `/usr/local/sbin/devcost-backup` | root 0755 | Backup script (called by cron) |
 | `/etc/cron.d/devcost-backup` | root 0644 | Cron job — daily at `BACKUP_HOUR:00` |
 
+## In-browser update detection
+
+The app fetches `https://api.github.com/repos/<repo>/commits/<branch>` every 15 min and shows a banner in the UI when a new commit is available. The banner has two modes, controlled by `UPDATER_MODE` in `/etc/devcost/devcost.env`:
+
+| Mode | Default | What the banner does |
+|---|---|---|
+| `display` | yes | Shows the new SHA + a "Copy update command" button. You paste the command in your Proxmox host SSH session. No new privileges granted to the app. |
+| `oneclick` | no | Adds a real **Update now** button that runs the upgrade for you (backup → pull → rebuild → restart). Requires `sudo` + a sudoers rule scoped to one helper script. |
+
+Switching modes:
+
+```bash
+# enable one-click on next install pass
+UPDATER_MODE=oneclick bash /opt/devcost/deploy/install.sh
+
+# back to display-only (also removes sudoers rule + helper)
+UPDATER_MODE=display bash /opt/devcost/deploy/install.sh
+```
+
+When `oneclick` is active, `install.sh` puts in place:
+
+| Path | Owner | Mode | Purpose |
+|---|---|---|---|
+| `/usr/local/sbin/devcost-update` | root | 0755 | Helper that pulls + rebuilds + restarts. Logs to `/var/log/devcost-update.log` |
+| `/etc/sudoers.d/devcost` | root | 0440 | Grants `devcost` passwordless `sudo` for **only** the helper above. Validated with `visudo -cf` before install. |
+
+Security model: the running app (as user `devcost`) can `sudo` exactly one root-owned script — nothing else. The script always pulls from `$REPO_URL` (`zries/dev_cost_tracker` `main` by default). If you don't trust auto-pulling from `main`, leave `UPDATER_MODE=display` and run upgrades manually.
+
+The frontend polls `/api/health` after triggering an update; when the build SHA flips, it auto-reloads the page. If the new build crash-loops, the banner times out at 5 min and tells you to check `journalctl -u devcost`.
+
+Tail update logs:
+```bash
+tail -f /var/log/devcost-update.log
+journalctl -u devcost -f
+```
+
 ## Schema upgrades
 
 The app runs an embedded migration system on every boot ([src/lib/server/db/migrations.ts](../src/lib/server/db/migrations.ts)). New schema changes ship as appended entries in the `MIGRATIONS` array and are applied idempotently — re-running `install.sh` to upgrade is safe. A `migrations` table records which ones have been applied to this DB.

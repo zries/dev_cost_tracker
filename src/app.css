@@ -133,6 +133,10 @@
 	.toast-info .toast-icon {
 		@apply bg-accent/20 text-accent;
 	}
+	.update-banner {
+		@apply flex items-center gap-3 px-4 py-2 text-sm
+			border-b border-accent/30 bg-accent/10 text-fg-base;
+	}
 	.table {
 		@apply w-full text-sm;
 	}

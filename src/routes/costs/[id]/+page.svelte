@@ -22,6 +22,31 @@
 		data.allocations.map((a) => ({ projectId: a.projectId, weight: a.weight }))
 	);
 	const projectScopeProjectId = $derived(data.allocations[0]?.projectId);
+
+	const integration = $derived(data.integration);
+	const providerOpts = $derived(data.providerOptions);
+	let chosenProvider = $state(untrack(() => data.providerOptions[0]?.id ?? ''));
+	const chosenProviderHelp = $derived(
+		providerOpts.find((p) => p.id === chosenProvider)?.keyHelp ?? ''
+	);
+	const chosenProviderPlaceholder = $derived(
+		providerOpts.find((p) => p.id === chosenProvider)?.keyPlaceholder ?? ''
+	);
+
+	function fmtRelative(unixSec: number | undefined | null): string {
+		if (!unixSec) return '—';
+		const diff = Math.floor(Date.now() / 1000) - unixSec;
+		if (diff < 60) return `${diff}s ago`;
+		if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+		if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+		return `${Math.floor(diff / 86400)}d ago`;
+	}
+
+	function fmtDateRange(startUnix: number, endUnix: number): string {
+		const s = new Date(startUnix * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+		const e = new Date(endUnix * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+		return `${s} – ${e}`;
+	}
 </script>
 
 <svelte:head><title>{c.name} · devcost</title></svelte:head>
@@ -57,6 +82,170 @@
 		<div class="text-sm font-medium">{c.currency}</div>
 	</div>
 </div>
+
+{#if providerOpts.length > 0}
+	<div class="card mb-4">
+		<div class="card-header">
+			<h2 class="font-medium">Live usage integration</h2>
+			{#if integration}
+				<span class="badge badge-shared">{integration.providerLabel}</span>
+			{:else}
+				<span class="text-xs text-fg-muted">optional · pulls month-to-date spend from the vendor</span>
+			{/if}
+		</div>
+		<div class="card-body space-y-3">
+			{#if !data.cryptoConfigured}
+				<p class="text-sm text-fg-muted">
+					Set <code>DEVCOST_SECRET_KEY</code> in the server env (32 random bytes, hex) to enable encrypted credential storage.
+				</p>
+			{/if}
+
+			{#if integration}
+				{@const snap = integration.snapshot}
+				<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+					<div>
+						<div class="text-xs text-fg-subtle">Provider</div>
+						<div class="text-sm font-medium">{integration.providerLabel}</div>
+					</div>
+					<div>
+						<div class="text-xs text-fg-subtle">API key</div>
+						<div class="text-sm font-medium tabular-nums">
+							{integration.keyHint ? `•••• ${integration.keyHint}` : '—'}
+						</div>
+					</div>
+					<div>
+						<div class="text-xs text-fg-subtle">Last refreshed</div>
+						<div class="text-sm font-medium">{fmtRelative(snap?.fetchedAt)}</div>
+					</div>
+					<div>
+						<div class="text-xs text-fg-subtle">Status</div>
+						<div class="text-sm font-medium">
+							{#if !snap}<span class="text-fg-muted">never refreshed</span>
+							{:else if snap.status === 'ok'}<span class="text-accent">live</span>
+							{:else}<span class="text-danger">error</span>{/if}
+						</div>
+					</div>
+				</div>
+
+				{#if snap && snap.status === 'ok'}
+					<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+						<div class="card card-body bg-bg-muted">
+							<div class="text-xs text-fg-subtle">Actual MTD ({fmtDateRange(snap.periodStart, snap.periodEnd)})</div>
+							<div class="text-lg font-semibold tabular-nums text-accent">{fmtMoneyPrecise(snap.actualAmount, snap.currency)}</div>
+						</div>
+						<div class="card card-body">
+							<div class="text-xs text-fg-subtle">Projected (full month)</div>
+							<div class="text-lg font-semibold tabular-nums">{fmtMoneyPrecise(snap.projectedAmount, snap.currency)}</div>
+						</div>
+						<div class="card card-body">
+							<div class="text-xs text-fg-subtle">Configured monthly</div>
+							<div class="text-lg font-semibold tabular-nums">{fmtMoneyPrecise(c.monthlyAmount, c.currency)}</div>
+							<div class="text-xs text-fg-muted">
+								{#if c.monthlyAmount > 0}
+									{@const delta = snap.projectedAmount - c.monthlyAmount}
+									{#if delta > 0}<span class="text-danger">+{fmtMoneyPrecise(delta, snap.currency)} over</span>
+									{:else}<span class="text-fg-muted">{fmtMoneyPrecise(delta, snap.currency)} vs config</span>{/if}
+								{/if}
+							</div>
+						</div>
+					</div>
+
+					{#if snap.breakdown.length > 0}
+						<details class="text-sm">
+							<summary class="text-xs text-fg-muted cursor-pointer hover:text-fg-base">Top {snap.breakdown.length} cost lines</summary>
+							<table class="table mt-2">
+								<tbody>
+									{#each snap.breakdown as line}
+										<tr>
+											<td class="text-fg-muted">{line.label}</td>
+											<td class="text-right tabular-nums">{fmtMoneyPrecise(line.amount, snap.currency)}</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</details>
+					{/if}
+				{:else if snap && snap.status === 'error'}
+					<p class="text-sm text-danger">Last refresh failed: {snap.message ?? 'unknown error'}</p>
+				{/if}
+
+				{#if form?.integrationError}
+					<p class="text-sm text-danger">{form.integrationError}</p>
+				{/if}
+
+				<div class="flex gap-2">
+					<form
+						method="POST"
+						action="?/refreshIntegration"
+						use:enhance={() => async ({ result, update }) => {
+							if (result.type === 'redirect') toast.success('Usage refreshed.');
+							else if (result.type === 'failure') toast.error((result.data as { integrationError?: string } | undefined)?.integrationError ?? 'Refresh failed.');
+							await update();
+						}}
+					>
+						<button type="submit" class="btn btn-primary">Refresh now</button>
+					</form>
+					<form
+						method="POST"
+						action="?/disconnectIntegration"
+						use:enhance={() => async ({ result, update }) => {
+							if (result.type === 'redirect') toast.success('Integration disconnected.');
+							await update();
+						}}
+					>
+						<button
+							type="submit"
+							class="btn btn-ghost btn-danger"
+							onclick={(e) => { if (!confirm('Disconnect integration and delete stored API key?')) e.preventDefault(); }}
+						>Disconnect</button>
+					</form>
+				</div>
+			{:else}
+				<form
+					method="POST"
+					action="?/connectIntegration"
+					use:enhance={() => async ({ result, update }) => {
+						if (result.type === 'redirect') toast.success('Integration connected.');
+						else if (result.type === 'failure') toast.error((result.data as { integrationError?: string } | undefined)?.integrationError ?? 'Could not connect.');
+						await update();
+					}}
+					class="grid grid-cols-1 sm:grid-cols-6 gap-3"
+				>
+					<div class="sm:col-span-2">
+						<label for="provider" class="label">Provider</label>
+						<select id="provider" name="provider" class="select" bind:value={chosenProvider}>
+							{#each providerOpts as p}
+								<option value={p.id}>{p.label}</option>
+							{/each}
+						</select>
+					</div>
+					<div class="sm:col-span-4">
+						<label for="api_key" class="label">API key</label>
+						<input
+							id="api_key"
+							name="api_key"
+							type="password"
+							autocomplete="off"
+							class="input font-mono"
+							placeholder={chosenProviderPlaceholder}
+							required
+							disabled={!data.cryptoConfigured}
+						/>
+					</div>
+					{#if chosenProviderHelp}
+						<p class="sm:col-span-6 text-xs text-fg-muted">{chosenProviderHelp}</p>
+					{/if}
+					{#if form?.integrationError}
+						<p class="sm:col-span-6 text-sm text-danger">{form.integrationError}</p>
+					{/if}
+					<div class="sm:col-span-6 flex justify-end">
+						<button type="submit" class="btn btn-primary" disabled={!data.cryptoConfigured}>Connect &amp; test</button>
+					</div>
+				</form>
+			{/if}
+		</div>
+	</div>
+{/if}
 
 <div class="card">
 	<div class="card-header"><h2 class="font-medium">Edit cost</h2></div>

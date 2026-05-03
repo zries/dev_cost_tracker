@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { fmtMoneyPrecise } from '$lib/format';
+	import { toast } from '$lib/toast.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -8,6 +10,23 @@
 	const yearly = $derived(s.totalMonthly * 12);
 	const errorCount = $derived(issues.filter((i) => i.severity === 'error').length);
 	const warnCount = $derived(issues.filter((i) => i.severity === 'warning').length);
+
+	const integrations = $derived(data.integrations);
+	const liveTotal = $derived(
+		integrations.reduce((sum, i) => sum + (i.snapshot?.actualAmount ?? 0), 0)
+	);
+	const liveProjected = $derived(
+		integrations.reduce((sum, i) => sum + (i.snapshot?.projectedAmount ?? 0), 0)
+	);
+
+	function fmtRelative(unixSec: number | undefined | null): string {
+		if (!unixSec) return '—';
+		const diff = Math.floor(Date.now() / 1000) - unixSec;
+		if (diff < 60) return `${diff}s ago`;
+		if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+		if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+		return `${Math.floor(diff / 86400)}d ago`;
+	}
 </script>
 
 <svelte:head><title>Dashboard · devcost</title></svelte:head>
@@ -46,6 +65,78 @@
 		<div class="text-xs text-fg-muted">tied to one project</div>
 	</div>
 </div>
+
+{#if integrations.length > 0}
+	<div class="card mb-6">
+		<div class="card-header">
+			<h2 class="font-medium">Live usage</h2>
+			<div class="flex items-center gap-3">
+				<span class="text-xs text-fg-muted tabular-nums">
+					MTD <strong class="text-fg-base">{fmtMoneyPrecise(liveTotal)}</strong>
+					· projected <strong class="text-fg-base">{fmtMoneyPrecise(liveProjected)}</strong>
+				</span>
+				<form
+					method="POST"
+					action="?/refreshAll"
+					use:enhance={() => async ({ result, update }) => {
+						if (result.type === 'redirect') toast.success('All integrations refreshed.');
+						else if (result.type === 'failure') toast.error((result.data as { error?: string } | undefined)?.error ?? 'Refresh failed.');
+						await update();
+					}}
+				>
+					<button type="submit" class="btn btn-ghost text-xs">Refresh all</button>
+				</form>
+			</div>
+		</div>
+		<table class="table">
+			<thead>
+				<tr>
+					<th>Cost</th>
+					<th>Provider</th>
+					<th class="text-right">Actual MTD</th>
+					<th class="text-right">Projected</th>
+					<th class="text-right">Configured</th>
+					<th class="text-right">Δ</th>
+					<th>Refreshed</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each integrations as i}
+					{@const snap = i.snapshot}
+					{@const delta = snap && snap.status === 'ok' ? snap.projectedAmount - i.costMonthly : 0}
+					<tr>
+						<td>
+							<a href="/costs/{i.costId}" class="font-medium hover:text-accent">{i.costName}</a>
+							{#if i.costVendor}<div class="text-xs text-fg-subtle">{i.costVendor}</div>{/if}
+						</td>
+						<td><span class="badge badge-shared">{i.providerLabel}</span></td>
+						<td class="text-right tabular-nums">
+							{#if snap && snap.status === 'ok'}{fmtMoneyPrecise(snap.actualAmount, snap.currency)}
+							{:else}<span class="text-fg-subtle">—</span>{/if}
+						</td>
+						<td class="text-right tabular-nums">
+							{#if snap && snap.status === 'ok'}{fmtMoneyPrecise(snap.projectedAmount, snap.currency)}
+							{:else}<span class="text-fg-subtle">—</span>{/if}
+						</td>
+						<td class="text-right tabular-nums text-fg-muted">{fmtMoneyPrecise(i.costMonthly, i.costCurrency)}</td>
+						<td class="text-right tabular-nums {delta > 0 ? 'text-danger' : 'text-fg-muted'}">
+							{#if snap && snap.status === 'ok'}
+								{delta > 0 ? '+' : ''}{fmtMoneyPrecise(delta, snap.currency)}
+							{:else}—{/if}
+						</td>
+						<td class="text-xs text-fg-muted">
+							{#if snap?.status === 'error'}
+								<span class="text-danger" title={snap.message ?? ''}>error</span>
+							{:else}
+								{fmtRelative(snap?.fetchedAt)}
+							{/if}
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+{/if}
 
 {#if issues.length > 0}
 	<div class="card mb-6 border-danger/40">
